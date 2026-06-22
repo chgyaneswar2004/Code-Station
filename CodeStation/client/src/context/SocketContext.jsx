@@ -24,7 +24,7 @@ export const useSocket = () => {
     return context
 }
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_SERVER_URL || "http://localhost:3000"
+const BACKEND_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_SERVER_URL || "http://localhost:3000"
 
 const SocketProvider = ({ children }) => {
     const {
@@ -36,7 +36,7 @@ const SocketProvider = ({ children }) => {
         setDrawingData,
     } = useAppContext()
 
-    const socket = useMemo(() => io(BACKEND_URL, { reconnectionAttempts: 2 }), [])
+    const socket = useMemo(() => io(BACKEND_URL, { reconnectionAttempts: 2, transports: ["websocket", "polling"] }), [])
     const syncTimeoutRef = useRef(null)
 
     const handleError = useCallback((err) => {
