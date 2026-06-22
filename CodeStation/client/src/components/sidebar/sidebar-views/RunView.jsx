@@ -40,11 +40,10 @@ function RunView() {
                         onChange={handleLanguageChange}
                     >
                         {supportedLanguages
-                            .sort((a, b) => (a.language > b.language ? 1 : -1))
+                            .sort((a, b) => (a.name > b.name ? 1 : -1))
                             .map((lang, i) => (
                                 <option key={i} value={JSON.stringify(lang)}>
-                                    {lang.language +
-                                        (lang.version ? ` (${lang.version})` : "")}
+                                    {lang.name}
                                 </option>
                             ))}
                     </select>

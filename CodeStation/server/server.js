@@ -1,18 +1,25 @@
-const express = require("express")
 const dotenv = require("dotenv")
+const path = require("path")
+
+dotenv.config({ path: path.join(__dirname, ".env") })
+
+
+const express = require("express")
+
 const http = require("http")
 const cors = require("cors")
 const { Server } = require("socket.io")
-const path = require("path")
 
-dotenv.config()
+const compilerRouter = require("./routes/onlineComplierAPI");
+
 
 const app = express()
 
 app.use(express.json())
 app.use(cors())
-app.use(express.static(path.join(__dirname, "public"))) // Serve static files
-app.use(express.static(path.join(__dirname, '../client/dist')))
+// app.use(express.static(path.join(__dirname, "public"))) // Serve static files
+// app.use(express.static(path.join(__dirname, '../client/dist')))
+app.use("/api/compiler", compilerRouter);
 
 const server = http.createServer(app)
 const io = new Server(server, {
@@ -522,14 +529,24 @@ io.on("connection", (socket) => {
 
 const PORT = process.env.PORT || 3000
 
+const fs = require("fs");
+
 app.get("/", (req, res) => {
-	// Send the index.html file
-	res.sendFile(path.join(__dirname, "..", "public", "index.html"))
+    const indexPath = path.join(__dirname, "..", "public", "index.html")
+    if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath)
+    } else {
+        res.json({ message: "Server is running" })
+    }
 })
 
-// Catch-all route: serve index.html for any unknown route (for React Router)
 app.get('*', (req, res) => {
-	res.sendFile(path.join(__dirname, '../client/dist/index.html'));
+    const distIndex = path.join(__dirname, '../client/dist/index.html');
+    if (fs.existsSync(distIndex)) {
+        res.sendFile(distIndex);
+    } else {
+        res.status(404).json({ message: "Client not built. Run: cd client && npm run build" });
+    }
 });
 
 server.listen(PORT, () => {

@@ -1,6 +1,6 @@
-import axiosInstance from "@/api/pistonApi"
+import { runCode as executeCode, getLanguages } from "@/api/compiler";
 import langMap from "lang-map"
-import {createContext,useContext,useEffect,useState} from "react"
+import { createContext, useContext, useEffect, useState } from "react"
 import toast from "react-hot-toast"
 import { useFileSystem } from "./FileContext"
 
@@ -21,22 +21,20 @@ const RunCodeContextProvider = ({ children }) => {
     const [isRunning, setIsRunning] = useState(false)
     const [supportedLanguages, setSupportedLanguages] = useState([])
     const [selectedLanguage, setSelectedLanguage] = useState({
-        language: "",
-        version: "",
-        aliases: []
+        id: "",
+        name: ""
     })
 
     useEffect(() => {
         const fetchSupportedLanguages = async () => {
             try {
-                const languages = await axiosInstance.get("/runtimes")
-                setSupportedLanguages(languages.data)
+                const { data } = await getLanguages()
+                setSupportedLanguages(data.compilers)
             } catch (error) {
                 toast.error("Failed to fetch supported languages")
                 if (error?.response?.data) console.error(error.response.data)
             }
         }
-
         fetchSupportedLanguages()
     }, [])
 
@@ -46,20 +44,22 @@ const RunCodeContextProvider = ({ children }) => {
         const extension = activeFile.name.split(".").pop()
         if (extension) {
             const languageName = langMap.languages(extension)
-            const language = supportedLanguages.find(
-                (lang) =>
-                    lang.aliases.includes(extension) ||
-                    languageName.includes(lang.language.toLowerCase())
+            // Match by checking if the compiler id or name includes the extension or language name
+            const language = supportedLanguages.find((lang) =>
+                lang.id.includes(extension) ||
+                languageName?.some((l) =>
+                    lang.name.toLowerCase().includes(l.toLowerCase())
+                )
             )
             if (language) setSelectedLanguage(language)
         } else {
-            setSelectedLanguage({ language: "", version: "", aliases: [] })
+            setSelectedLanguage({ id: "", name: "" })
         }
     }, [activeFile?.name, supportedLanguages])
 
     const runCode = async () => {
         try {
-            if (!selectedLanguage.language) {
+            if (!selectedLanguage.id) {
                 return toast.error("Please select a language to run the code")
             }
             if (!activeFile) {
@@ -69,19 +69,16 @@ const RunCodeContextProvider = ({ children }) => {
             toast.loading("Running code...")
             setIsRunning(true)
 
-            const { language, version } = selectedLanguage
+            const { data } = await executeCode(
+                selectedLanguage.id,
+                activeFile.content,
+                input
+            )
 
-            const response = await axiosInstance.post("/execute", {
-                language,
-                version,
-                files: [{ name: activeFile.name, content: activeFile.content }],
-                stdin: input
-            })
-
-            if (response.data.run.stderr) {
-                setOutput(response.data.run.stderr)
+            if (data.error) {
+                setOutput(data.error)
             } else {
-                setOutput(response.data.run.stdout)
+                setOutput(data.output)
             }
 
             toast.dismiss()
