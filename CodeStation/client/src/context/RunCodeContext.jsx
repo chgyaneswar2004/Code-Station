@@ -1,4 +1,4 @@
-import { runCode as executeCode, getLanguages } from "@/api/compiler";
+import { runCode as executeCode, getLanguages } from "@/services/compiler.service";
 import langMap from "lang-map"
 import { createContext, useContext, useEffect, useState } from "react"
 import toast from "react-hot-toast"

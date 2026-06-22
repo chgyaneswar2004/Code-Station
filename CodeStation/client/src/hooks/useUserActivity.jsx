@@ -1,20 +1,8 @@
 import { useAppContext } from "@/context/AppContext"
 import { useSocket } from "@/context/SocketContext"
 import { useCallback, useEffect } from "react"
-
-// Socket event constants
-const SocketEvent = {
-    USER_ONLINE: "USER_ONLINE",
-    USER_OFFLINE: "USER_OFFLINE",
-    TYPING_START: "TYPING_START",
-    TYPING_PAUSE: "TYPING_PAUSE"
-}
-
-// User connection status constants
-const USER_CONNECTION_STATUS = {
-    ONLINE: "online",
-    OFFLINE: "offline"
-}
+import { SocketEvent } from "@/types/socket"
+import { USER_CONNECTION_STATUS } from "@/types/user"
 
 function useUserActivity() {
     const { setUsers } = useAppContext()

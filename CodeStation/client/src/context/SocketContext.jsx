@@ -24,7 +24,7 @@ export const useSocket = () => {
     return context
 }
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3000"
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_SERVER_URL || "http://localhost:3000"
 
 const SocketProvider = ({ children }) => {
     const {
@@ -34,8 +34,6 @@ const SocketProvider = ({ children }) => {
         setCurrentUser,
         drawingData,
         setDrawingData,
-        // Add messages state to AppContext if not already present
-        setMessages, // You'll need to add this to your AppContext
     } = useAppContext()
 
     const socket = useMemo(() => io(BACKEND_URL, { reconnectionAttempts: 2 }), [])
@@ -122,18 +120,7 @@ const SocketProvider = ({ children }) => {
         toast.dismiss();
     }, [])
 
-    // NEW: Handle message synchronization
-    const handleSyncMessages = useCallback(({ messages }) => {
-        console.log("Received message sync data:", messages);
-        setMessages(messages);
-        
-        // Clear the sync timeout and dismiss loading toast if this is the last sync operation
-        if (syncTimeoutRef.current) {
-            clearTimeout(syncTimeoutRef.current)
-            syncTimeoutRef.current = null
-        }
-        toast.dismiss();
-    }, [setMessages])
+
 
     useEffect(() => {
         socket.on("connect_error", handleError)
@@ -146,8 +133,7 @@ const SocketProvider = ({ children }) => {
         socket.on(SocketEvent.SYNC_DRAWING, handleDrawingSync)
         // Add handler for no drawing data event
         socket.on(SocketEvent.NO_DRAWING_DATA, handleNoDrawingData)
-        // NEW: Add handler for message synchronization
-        socket.on(SocketEvent.SYNC_MESSAGES, handleSyncMessages)
+
 
         return () => {
             // Clear timeout on cleanup
@@ -164,7 +150,7 @@ const SocketProvider = ({ children }) => {
             socket.off(SocketEvent.REQUEST_DRAWING, handleRequestDrawing)
             socket.off(SocketEvent.SYNC_DRAWING, handleDrawingSync)
             socket.off(SocketEvent.NO_DRAWING_DATA, handleNoDrawingData)
-            socket.off(SocketEvent.SYNC_MESSAGES, handleSyncMessages)
+
         }
     }, [
         handleError,
@@ -175,7 +161,6 @@ const SocketProvider = ({ children }) => {
         handleRequestDrawing,
         handleDrawingSync,
         handleNoDrawingData,
-        handleSyncMessages,
         socket,
     ])
 

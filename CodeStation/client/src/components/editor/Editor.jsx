@@ -4,6 +4,7 @@ import { useSettings } from "@/context/SettingContext";
 import { useSocket } from "@/context/SocketContext";
 import usePageEvents from "@/hooks/usePageEvents";
 import useResponsive from "@/hooks/useResponsive";
+import { SocketEvent } from "@/types/socket";
 import { editorThemes } from "@/resources/Themes";
 import { color } from "@uiw/codemirror-extensions-color";
 import { hyperLink } from "@uiw/codemirror-extensions-hyper-link";

@@ -22,6 +22,24 @@ export const VIEWS = {
     RUN: "RUN",
 }
 
+const viewComponents = {
+    [VIEWS.FILES]: <FilesView />,
+    [VIEWS.CLIENTS]: <UsersView />,
+    [VIEWS.SETTINGS]: <SettingsView />,
+    // [VIEWS.COPILOT]: <CopilotView />,
+    [VIEWS.CHATS]: <ChatsView />,
+    [VIEWS.RUN]: <RunView />,
+}
+
+const viewIcons = {
+    [VIEWS.FILES]: <LuFiles size={28} />,
+    [VIEWS.CLIENTS]: <PiUsers size={30} />,
+    [VIEWS.SETTINGS]: <IoSettingsOutline size={28} />,
+    // [VIEWS.COPILOT]: <LuSparkles size={28} />,
+    [VIEWS.CHATS]: <PiChats size={30} />,
+    [VIEWS.RUN]: <PiPlay size={28} />,
+}
+
 const ViewContext = createContext(null)
 
 export const useViews = () => {
@@ -65,23 +83,7 @@ const ViewContextProvider = ({ children }) => {
         }
     }, [])
 
-    const [viewComponents] = useState({
-        [VIEWS.FILES]: <FilesView />,
-        [VIEWS.CLIENTS]: <UsersView />,
-        [VIEWS.SETTINGS]: <SettingsView />,
-        // [VIEWS.COPILOT]: <CopilotView />,
-        [VIEWS.CHATS]: <ChatsView />,
-        [VIEWS.RUN]: <RunView />,
-    })
 
-    const [viewIcons] = useState({
-        [VIEWS.FILES]: <LuFiles size={28} />,
-        [VIEWS.CLIENTS]: <PiUsers size={30} />,
-        [VIEWS.SETTINGS]: <IoSettingsOutline size={28} />,
-        // [VIEWS.COPILOT]: <LuSparkles size={28} />,
-        [VIEWS.CHATS]: <PiChats size={30} />,
-        [VIEWS.RUN]: <PiPlay size={28} />,
-    })
 
     return (
         <ViewContext.Provider
