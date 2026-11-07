@@ -9,6 +9,24 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Build Docker image on GitHub runner
+        run: |
+          docker build -t codestation:latest ./CodeStation
+          docker save -o "$GITHUB_WORKSPACE/codestation-image.tar" codestation:latest
+
+      - name: Copy image to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_SSH_USER }}
+          key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          fingerprint: ${{ secrets.EC2_HOST_FINGERPRINT }}
+          source: codestation-image.tar
+          target: /tmp/
+
       - name: Deploy over SSH
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -21,7 +39,9 @@ jobs:
             cd "${{ secrets.EC2_APP_PATH }}"
             git pull --ff-only origin main
             cd CodeStation
-            docker compose up -d --build --remove-orphans
+            docker load -i /tmp/codestation-image.tar
+            rm -f /tmp/codestation-image.tar
+            docker compose up -d --no-build --pull never --remove-orphans
             docker image prune -f
             for attempt in 1 2 3 4 5 6; do
               if docker compose exec -T codestation node -e "fetch('http://127.0.0.1:3000/api/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"; then

@@ -1,6 +1,6 @@
 # CodeStation AWS Deployment
 
-This setup uses one EC2 instance in Sydney (`ap-southeast-2`), Docker Compose, a private S3 bucket for explicit room snapshots, and GitHub Actions over SSH for deploys. The app currently serves temporary HTTP on port `80`.
+This setup uses one EC2 instance in Sydney (`ap-southeast-2`), Docker Compose, a private S3 bucket for explicit room snapshots, and GitHub Actions over SSH for deploys. GitHub builds the Docker image and transfers it to EC2, so the small EC2 host does not need to compile the frontend. The app currently serves temporary HTTP on port `80`.
 
 ## Room snapshot storage
 
@@ -19,13 +19,13 @@ Attach an EC2 instance role to the instance. Give that role `s3:GetObject` and `
 3. Install Docker Engine and the Docker Compose plugin on the instance.
 4. Add a read-only GitHub deploy key to the repository, then clone the repository to a persistent path such as `/opt/codestation`. The application project is inside the `CodeStation` subfolder.
 5. Change into `/opt/codestation/CodeStation`, copy `server/.env.example` to `server/.env`, and fill in the application values, including `S3_BUCKET_NAME`. Keep this file on the host; it is excluded from Docker build context.
-6. From `/opt/codestation/CodeStation`, run `docker compose up -d --build` and confirm `http://EC2_PUBLIC_IP/api/health` returns `{"status":"ok"}`.
+6. Do not build the image on the EC2 host. After setting up the GitHub Actions secrets below, open **GitHub → Actions → Deploy CodeStation to EC2 → Run workflow**. The workflow builds on GitHub, transfers the image, and starts it on EC2. Then confirm `http://EC2_PUBLIC_IP/api/health` returns `{"status":"ok"}`.
 
-The Compose file publishes the app on port `80`. Keep the instance role and host `.env` in place when deploying; CI only pulls code and rebuilds the container. Set `S3_BUCKET_NAME` to the bucket name there before starting the production container.
+The Compose file publishes the app on port `80`. Keep the instance role and host `.env` in place when deploying; CI pulls the latest Compose configuration and starts the image built on GitHub. Set `S3_BUCKET_NAME` to the bucket name there before starting the production container.
 
 ## GitHub Actions deployment
 
-The workflow `.github/workflows/deploy-ec2.yml` is at the repository root. It runs on pushes to `main` and manual dispatch. Add these GitHub Actions repository secrets:
+The workflow `.github/workflows/deploy-ec2.yml` is at the repository root. It builds on pushes to `main` and supports manual dispatch. Add these GitHub Actions repository secrets:
 
 - `EC2_HOST`: the instance public IP or DNS name.
 - `EC2_SSH_USER`: the host login user, commonly `ubuntu` or `ec2-user`.
