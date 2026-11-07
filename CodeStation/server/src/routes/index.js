@@ -21,9 +21,13 @@ router.use("/api/bob", bobRouter);
 router.use("/api/compiler/run", compilerRateLimiter);
 router.use("/api/v1/compiler/run", compilerRateLimiter);
 
+// Serve the Vite build assets before the SPA fallback routes.
+const clientDistPath = path.join(__dirname, "../../../client/dist");
+router.use(express.static(clientDistPath, { index: false }));
+
 // Serve the production client when available; retain the simple server page for API-only dev.
 router.get("/", (_req, res) => {
-  const distIndex = path.join(__dirname, "../../../client/dist/index.html");
+  const distIndex = path.join(clientDistPath, "index.html");
   if (fs.existsSync(distIndex)) {
     return res.sendFile(distIndex);
   }
@@ -37,7 +41,7 @@ router.get("/", (_req, res) => {
 
 // Fallback route to serve react production build
 router.get("*", (req, res) => {
-  const distIndex = path.join(__dirname, "../../../client/dist/index.html");
+  const distIndex = path.join(clientDistPath, "index.html");
   if (fs.existsSync(distIndex)) {
     res.sendFile(distIndex);
   } else {
