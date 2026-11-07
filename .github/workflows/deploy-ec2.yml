@@ -20,6 +20,7 @@ jobs:
             set -eu
             cd "${{ secrets.EC2_APP_PATH }}"
             git pull --ff-only origin main
+            cd CodeStation
             docker compose up -d --build --remove-orphans
             docker image prune -f
             for attempt in 1 2 3 4 5 6; do

@@ -17,27 +17,27 @@ Attach an EC2 instance role to the instance. Give that role `s3:GetObject` and `
 1. Create an EC2 instance in `ap-southeast-2` and attach an instance role with S3 access as described above.
 2. Configure its security group with inbound TCP `80` from the clients who should reach the app. Restrict TCP `22` to your own public IP, as [AWS recommends](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/creating-security-group.html).
 3. Install Docker Engine and the Docker Compose plugin on the instance.
-4. Add a read-only GitHub deploy key to the repository, then clone the repository to a persistent path such as `/opt/codestation`.
-5. Copy `server/.env.example` to `server/.env` on the instance and fill in the application values, including `S3_BUCKET_NAME`. Keep this file on the host; it is excluded from Docker build context.
-6. From the repository directory, run `docker compose up -d --build` and confirm `http://EC2_PUBLIC_IP/api/health` returns `{"status":"ok"}`.
+4. Add a read-only GitHub deploy key to the repository, then clone the repository to a persistent path such as `/opt/codestation`. The application project is inside the `CodeStation` subfolder.
+5. Change into `/opt/codestation/CodeStation`, copy `server/.env.example` to `server/.env`, and fill in the application values, including `S3_BUCKET_NAME`. Keep this file on the host; it is excluded from Docker build context.
+6. From `/opt/codestation/CodeStation`, run `docker compose up -d --build` and confirm `http://EC2_PUBLIC_IP/api/health` returns `{"status":"ok"}`.
 
 The Compose file publishes the app on port `80`. Keep the instance role and host `.env` in place when deploying; CI only pulls code and rebuilds the container. Set `S3_BUCKET_NAME` to the bucket name there before starting the production container.
 
 ## GitHub Actions deployment
 
-The workflow `.github/workflows/deploy-ec2.yml` runs on pushes to `main` and manual dispatch. Add these GitHub Actions repository secrets:
+The workflow `.github/workflows/deploy-ec2.yml` is at the repository root. It runs on pushes to `main` and manual dispatch. Add these GitHub Actions repository secrets:
 
 - `EC2_HOST`: the instance public IP or DNS name.
 - `EC2_SSH_USER`: the host login user, commonly `ubuntu` or `ec2-user`.
 - `EC2_SSH_PRIVATE_KEY`: a deploy-only private SSH key authorized on the host.
 - `EC2_HOST_FINGERPRINT`: the EC2 SSH host-key fingerprint, obtained and verified during initial host setup.
-- `EC2_APP_PATH`: the cloned repository directory, for example `/opt/codestation`.
+- `EC2_APP_PATH`: the cloned repository root, for example `/opt/codestation`. The workflow pulls there, then deploys from its `CodeStation` subfolder.
 
 The EC2 clone must have a read-only repository deploy key configured so `git pull` can fetch a private repository. The workflow does not transfer secrets or the host `.env` file. If your default branch is not `main`, update the workflow trigger and pull command to match it.
 
 ## Local Docker run
 
-Copy `server/.env.example` to `server/.env`, fill required values, then run:
+From the `CodeStation` project directory, copy `server/.env.example` to `server/.env`, fill required values, then run:
 
 ```sh
 docker compose up --build
