@@ -30,6 +30,7 @@ The workflow `.github/workflows/deploy-ec2.yml` is at the repository root. It bu
 - `EC2_HOST`: the instance public IP or DNS name.
 - `EC2_SSH_USER`: the host login user, commonly `ubuntu` or `ec2-user`.
 - `EC2_SSH_PRIVATE_KEY`: a deploy-only private SSH key authorized on the host.
+- `EC2_SSH_PASSPHRASE`: the key passphrase, if the private key is encrypted; leave unset for an unencrypted key.
 - `EC2_HOST_FINGERPRINT`: the EC2 SSH host-key fingerprint, obtained and verified during initial host setup.
 - `EC2_APP_PATH`: the cloned repository root, for example `/opt/codestation`. The workflow pulls there, then deploys from its `CodeStation` subfolder.
 

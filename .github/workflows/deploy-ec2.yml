@@ -24,6 +24,7 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_SSH_USER }}
           key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          passphrase: ${{ secrets.EC2_SSH_PASSPHRASE }}
           fingerprint: ${{ secrets.EC2_HOST_FINGERPRINT }}
           source: codestation-image.tar.gz
           target: /tmp/
@@ -34,6 +35,7 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_SSH_USER }}
           key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          passphrase: ${{ secrets.EC2_SSH_PASSPHRASE }}
           fingerprint: ${{ secrets.EC2_HOST_FINGERPRINT }}
           script: |
             set -eu
