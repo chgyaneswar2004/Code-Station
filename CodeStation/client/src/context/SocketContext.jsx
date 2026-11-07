@@ -24,20 +24,21 @@ export const useSocket = () => {
     return context
 }
 
-const BACKEND_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_SERVER_URL || "http://localhost:3000"
+const BACKEND_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_SERVER_URL || (import.meta.env.DEV ? "http://localhost:3000" : window.location.origin)
 
 const SocketProvider = ({ children }) => {
     const {
         users,
         setUsers,
+        currentUser,
         setStatus,
         setCurrentUser,
-        drawingData,
         setDrawingData,
     } = useAppContext()
 
-    const socket = useMemo(() => io(BACKEND_URL, { reconnectionAttempts: 2, transports: ["websocket", "polling"] }), [])
+    const socket = useMemo(() => io(BACKEND_URL, { reconnectionAttempts: Infinity, reconnectionDelayMax: 5000, transports: ["websocket", "polling"] }), [])
     const syncTimeoutRef = useRef(null)
+    const hasJoinedRoomRef = useRef(false)
 
     const handleError = useCallback((err) => {
         console.error("Socket error:", err)
@@ -47,6 +48,7 @@ const SocketProvider = ({ children }) => {
     }, [setStatus])
 
     const handleUsernameExist = useCallback(() => {
+        hasJoinedRoomRef.current = false
         toast.dismiss()
         setStatus(USER_STATUS.INITIAL)
         toast.error(
@@ -55,6 +57,7 @@ const SocketProvider = ({ children }) => {
     }, [setStatus])
 
     const handleJoiningAccept = useCallback(({ user, users }) => {
+        hasJoinedRoomRef.current = true
         setCurrentUser(user)
         setUsers(users)
         toast.dismiss()
@@ -86,18 +89,7 @@ const SocketProvider = ({ children }) => {
         toast.success(`${user.username} joined the room`);
     }, [setUsers]);
 
-    const handleRequestDrawing = useCallback(({ socketId }) => {
-        console.log("Requesting drawing sync for socketId:", socketId);
-        if (drawingData && Object.keys(drawingData).length > 0) {
-            socket.emit(SocketEvent.SYNC_DRAWING, { socketId, drawingData });
-        } else {
-            // If there's no drawing data to sync, send empty data
-            socket.emit(SocketEvent.SYNC_DRAWING, { socketId, drawingData: {} });
-        }
-    }, [drawingData, socket])
-
     const handleDrawingSync = useCallback(({ drawingData }) => {
-        console.log("Received drawing sync data:", drawingData);
         setDrawingData(drawingData);
         
         // Clear the sync timeout and dismiss loading toast
@@ -110,15 +102,39 @@ const SocketProvider = ({ children }) => {
 
     // Handle when there's no drawing data to sync (new event from backend)
     const handleNoDrawingData = useCallback(() => {
-        console.log("No drawing data available for sync");
-        
+        setDrawingData(null)
+        window.dispatchEvent(new Event("drawing:no-data"))
         // Clear the sync timeout and dismiss loading toast
         if (syncTimeoutRef.current) {
             clearTimeout(syncTimeoutRef.current)
             syncTimeoutRef.current = null
         }
         toast.dismiss();
-    }, [])
+    }, [setDrawingData])
+
+    const handleRoomError = useCallback(({ message }) => {
+        hasJoinedRoomRef.current = false
+        toast.dismiss()
+        setStatus(USER_STATUS.INITIAL)
+        toast.error(message || "Could not load this room.")
+    }, [setStatus])
+
+    const handleRoomNotFound = useCallback(() => {
+        hasJoinedRoomRef.current = false
+        toast.dismiss()
+        setStatus(USER_STATUS.INITIAL)
+        toast.error("Room not found. Create a new room or check the five-character code.")
+    }, [setStatus])
+
+    useEffect(() => {
+        const handleReconnect = () => {
+            if (hasJoinedRoomRef.current && currentUser.username && currentUser.roomId) {
+                socket.emit(SocketEvent.JOIN_REQUEST, currentUser)
+            }
+        }
+        socket.on("connect", handleReconnect)
+        return () => socket.off("connect", handleReconnect)
+    }, [currentUser, socket])
 
 
 
@@ -129,10 +145,11 @@ const SocketProvider = ({ children }) => {
         socket.on(SocketEvent.JOIN_ACCEPTED, handleJoiningAccept)
         socket.on(SocketEvent.USER_JOINED, handleUserJoined)
         socket.on(SocketEvent.USER_DISCONNECTED, handleUserLeft)
-        socket.on(SocketEvent.REQUEST_DRAWING, handleRequestDrawing)
         socket.on(SocketEvent.SYNC_DRAWING, handleDrawingSync)
         // Add handler for no drawing data event
         socket.on(SocketEvent.NO_DRAWING_DATA, handleNoDrawingData)
+        socket.on(SocketEvent.ROOM_ERROR, handleRoomError)
+        socket.on(SocketEvent.ROOM_NOT_FOUND, handleRoomNotFound)
 
 
         return () => {
@@ -147,9 +164,10 @@ const SocketProvider = ({ children }) => {
             socket.off(SocketEvent.JOIN_ACCEPTED, handleJoiningAccept)
             socket.off(SocketEvent.USER_JOINED, handleUserJoined)
             socket.off(SocketEvent.USER_DISCONNECTED, handleUserLeft)
-            socket.off(SocketEvent.REQUEST_DRAWING, handleRequestDrawing)
             socket.off(SocketEvent.SYNC_DRAWING, handleDrawingSync)
             socket.off(SocketEvent.NO_DRAWING_DATA, handleNoDrawingData)
+            socket.off(SocketEvent.ROOM_ERROR, handleRoomError)
+            socket.off(SocketEvent.ROOM_NOT_FOUND, handleRoomNotFound)
 
         }
     }, [
@@ -158,9 +176,10 @@ const SocketProvider = ({ children }) => {
         handleJoiningAccept,
         handleUserJoined,
         handleUserLeft,
-        handleRequestDrawing,
         handleDrawingSync,
         handleNoDrawingData,
+        handleRoomError,
+        handleRoomNotFound,
         socket,
     ])
 

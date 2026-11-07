@@ -2,7 +2,7 @@ import { useAppContext } from "@/context/AppContext";
 import { useSocket } from "@/context/SocketContext";
 import { SocketEvent } from "@/types/socket";
 import useWindowDimensions from "@/hooks/useWindowDimensions";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { Tldraw, useEditor } from "tldraw";
 
 /**
@@ -28,19 +28,16 @@ function DrawingEditor() {
  */
 function ReachEditor() {
     const editor = useEditor();
-    const { drawingData, setDrawingData } = useAppContext();
+    const { drawingData } = useAppContext();
     const { socket } = useSocket();
+    const loadedSnapshotRef = useRef(null);
+    const emptySnapshotRef = useRef(editor.store.getSnapshot());
 
     // Handle local drawing changes and emit to other clients
     const handleChangeEvent = useCallback((change) => {
         const snapshot = change.changes;
-
-        // Update drawing data in local context
-        setDrawingData(editor.store.getSnapshot());
-
-        // Emit changes to other clients
         socket.emit(SocketEvent.DRAWING_UPDATE, { snapshot });
-    }, [editor.store, setDrawingData, socket]);
+    }, [socket]);
 
     // Handle incoming drawing updates from remote clients
     const handleRemoteDrawing = useCallback(({ snapshot }) => {
@@ -58,15 +55,29 @@ function ReachEditor() {
             });
         });
 
-        setDrawingData(editor.store.getSnapshot());
-    }, [editor.store, setDrawingData]);
+    }, [editor.store]);
 
-    // Load initial drawing data when component mounts
+    // Apply server snapshots whether they arrive before or after the editor mounts.
     useEffect(() => {
-        if (drawingData && Object.keys(drawingData).length > 0) {
-            editor.store.loadSnapshot(drawingData);
-        }
-    }, []);
+        if (!drawingData?.store || loadedSnapshotRef.current === drawingData) return;
+        editor.store.mergeRemoteChanges(() => editor.store.loadSnapshot(drawingData));
+        loadedSnapshotRef.current = drawingData;
+    }, [drawingData, editor.store]);
+
+    useEffect(() => {
+        const clearDrawing = () => {
+            editor.store.mergeRemoteChanges(() => editor.store.loadSnapshot(emptySnapshotRef.current));
+            loadedSnapshotRef.current = null;
+        };
+        window.addEventListener("drawing:no-data", clearDrawing);
+        return () => window.removeEventListener("drawing:no-data", clearDrawing);
+    }, [editor.store]);
+
+    // Seed the room only if it has no snapshot yet; the server never overwrites
+    // a drawing that another participant already created.
+    useEffect(() => {
+        socket.emit(SocketEvent.DRAWING_SNAPSHOT, { drawingData: editor.store.getSnapshot() });
+    }, [editor.store, socket]);
 
     // Set up event listeners for drawing changes and socket events
     useEffect(() => {
@@ -81,7 +92,7 @@ function ReachEditor() {
             cleanupFunction();
             socket.off(SocketEvent.DRAWING_UPDATE);
         };
-    }, [drawingData, editor.store, handleChangeEvent, handleRemoteDrawing, socket]);
+    }, [editor.store, handleChangeEvent, handleRemoteDrawing, socket]);
 
     return null;
 }

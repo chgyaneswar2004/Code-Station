@@ -35,9 +35,42 @@ const getRoomDrawingData = (roomId) => {
 };
 
 const saveRoomDrawingData = (roomId, drawingData) => {
-  roomDrawingData.set(roomId, drawingData);
-  logger.info(`Saved drawing data for room ${roomId}`);
+  if (!drawingData || typeof drawingData !== "object") return;
+
+  // Full tldraw snapshots are authoritative. Change events are merged into
+  // the current snapshot so late joiners never receive only the last delta.
+  if (drawingData.store && drawingData.schema) {
+    roomDrawingData.set(roomId, drawingData);
+    logger.info(`Saved drawing snapshot for room ${roomId}`);
+    return;
+  }
+
+  const current = roomDrawingData.get(roomId);
+  if (!current?.store || (!drawingData.added && !drawingData.updated && !drawingData.removed)) return;
+
+  const store = { ...current.store };
+  for (const record of Object.values(drawingData.added || {})) {
+    store[record.id] = record;
+  }
+  for (const update of Object.values(drawingData.updated || {})) {
+    const record = Array.isArray(update) ? update[1] : update;
+    if (record?.id) store[record.id] = record;
+  }
+  for (const record of Object.values(drawingData.removed || {})) {
+    if (record?.id) delete store[record.id];
+  }
+
+  roomDrawingData.set(roomId, { ...current, store });
+  logger.info(`Applied drawing changes to room ${roomId}`);
 };
+
+const saveRoomDrawingDataIfAbsent = (roomId, drawingData) => {
+  if (roomDrawingData.has(roomId) || !drawingData?.store || !drawingData?.schema) return false;
+  roomDrawingData.set(roomId, drawingData);
+  logger.info(`Initialized drawing snapshot for room ${roomId}`);
+  return true;
+};
+
 
 const getRoomChatMessages = (roomId) => {
   return roomChatMessages.get(roomId) || [];
@@ -52,6 +85,33 @@ const saveRoomChatMessage = (roomId, message) => {
 
 const getRoomState = (roomId) => {
   return roomFileStructures.get(roomId) || null;
+};
+
+const hasRoomState = (roomId) => roomFileStructures.has(roomId);
+
+const reserveRoom = (roomId) => {
+  if (roomFileStructures.has(roomId)) return false;
+  updateRoomState(roomId, {});
+  return true;
+};
+
+const restoreRoomSnapshot = (roomId, snapshot) => {
+  if (!snapshot || typeof snapshot !== "object") return;
+  if (snapshot.fileStructure) {
+    updateRoomState(roomId, { fileStructure: snapshot.fileStructure, openFiles: [], activeFile: null });
+  }
+  if (snapshot.drawingData) roomDrawingData.set(roomId, snapshot.drawingData);
+};
+
+const createRoomSnapshot = (roomId) => {
+  const state = getRoomState(roomId);
+  return {
+    schemaVersion: 1,
+    roomId,
+    savedAt: new Date().toISOString(),
+    fileStructure: state?.fileStructure || { name: "root", id: "root", type: "directory", children: [] },
+    drawingData: getRoomDrawingData(roomId),
+  };
 };
 
 const updateRoomState = (roomId, partial) => {
@@ -120,10 +180,15 @@ module.exports = {
   getUserBySocketId,
   getRoomDrawingData,
   saveRoomDrawingData,
+  saveRoomDrawingDataIfAbsent,
   getRoomChatMessages,
   saveRoomChatMessage,
   getRoomState,
+  hasRoomState,
+  reserveRoom,
   updateRoomState,
+  restoreRoomSnapshot,
+  createRoomSnapshot,
   addUser,
   removeUser,
   updateUserStatus,

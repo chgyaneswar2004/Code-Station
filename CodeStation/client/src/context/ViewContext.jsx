@@ -4,6 +4,7 @@ import ChatsView from "@/components/sidebar/sidebar-views/ChatsView"
 // import CopilotView from "@/components/sidebar/sidebar-views/CopilotView"
 import FilesView from "@/components/sidebar/sidebar-views/FilesView"
 import RunView from "@/components/sidebar/sidebar-views/RunView"
+import BobView from "../../../bob/client/BobView.jsx"
 import SettingsView from "@/components/sidebar/sidebar-views/SettingsView"
 import UsersView from "@/components/sidebar/sidebar-views/UsersView"
 import useWindowDimensions from "@/hooks/useWindowDimensions"
@@ -26,7 +27,7 @@ const viewComponents = {
     [VIEWS.FILES]: <FilesView />,
     [VIEWS.CLIENTS]: <UsersView />,
     [VIEWS.SETTINGS]: <SettingsView />,
-    // [VIEWS.COPILOT]: <CopilotView />,
+    [VIEWS.COPILOT]: <BobView />,
     [VIEWS.CHATS]: <ChatsView />,
     [VIEWS.RUN]: <RunView />,
 }
@@ -35,7 +36,7 @@ const viewIcons = {
     [VIEWS.FILES]: <LuFiles size={28} />,
     [VIEWS.CLIENTS]: <PiUsers size={30} />,
     [VIEWS.SETTINGS]: <IoSettingsOutline size={28} />,
-    // [VIEWS.COPILOT]: <LuSparkles size={28} />,
+    [VIEWS.COPILOT]: <LuSparkles size={28} />,
     [VIEWS.CHATS]: <PiChats size={30} />,
     [VIEWS.RUN]: <PiPlay size={28} />,
 }

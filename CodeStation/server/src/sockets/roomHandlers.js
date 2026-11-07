@@ -1,20 +1,45 @@
 const logger = require("../utils/logger");
 const { SocketEvent, USER_CONNECTION_STATUS } = require("../utils/constants");
 const roomService = require("../services/room.service");
+const roomSnapshotStorage = require("../services/roomSnapshot.storage");
+const { randomInt } = require("crypto");
+
+const ROOM_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const generateRoomCode = () => Array.from({ length: 5 }, () =>
+  ROOM_CODE_ALPHABET[randomInt(ROOM_CODE_ALPHABET.length)]
+).join("");
 
 module.exports = (io, socket) => {
   // Handle user actions: join request
-  socket.on(SocketEvent.JOIN_REQUEST, ({ roomId, username }) => {
+  socket.on(SocketEvent.JOIN_REQUEST, async ({ roomId, username }) => {
+    if (typeof roomId !== "string" || !/^[A-Z0-9]{5}$/.test(roomId) || typeof username !== "string") {
+      io.to(socket.id).emit(SocketEvent.ROOM_NOT_FOUND);
+      return;
+    }
     logger.info(`User ${username} attempting to join room ${roomId}`);
-    
-    // Check if username exists in the room
+
     const existingUsers = roomService.getUsersInRoom(roomId);
     const isUsernameExist = existingUsers.filter((u) => u.username === username);
-    
     if (isUsernameExist.length > 0) {
       logger.warn(`Username ${username} already exists in room ${roomId}`);
       io.to(socket.id).emit(SocketEvent.USERNAME_EXISTS);
       return;
+    }
+
+    // Load a saved room before admitting the user so the first sync is complete.
+    if (!roomService.hasRoomState(roomId) && !roomService.getRoomDrawingData(roomId) && existingUsers.length === 0) {
+      try {
+        const snapshot = await roomSnapshotStorage.loadRoomSnapshot(roomId);
+        if (snapshot) roomService.restoreRoomSnapshot(roomId, snapshot);
+        else {
+          io.to(socket.id).emit(SocketEvent.ROOM_NOT_FOUND);
+          return;
+        }
+      } catch (error) {
+        logger.error(`Failed to load snapshot for room ${roomId}:`, error);
+        io.to(socket.id).emit(SocketEvent.ROOM_ERROR, { message: "Could not load this room snapshot. Please try again." });
+        return;
+      }
     }
 
     // Add user to room state
@@ -63,6 +88,51 @@ module.exports = (io, socket) => {
         openFiles: [],
         activeFile: null,
       });
+    }
+  });
+
+  socket.on(SocketEvent.CREATE_ROOM, async (acknowledge) => {
+    try {
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        const roomId = generateRoomCode();
+        if (roomService.hasRoomState(roomId) || roomService.getUsersInRoom(roomId).length > 0) continue;
+
+        const snapshot = {
+          schemaVersion: 1,
+          roomId,
+          savedAt: new Date().toISOString(),
+          fileStructure: { name: "root", id: "root", type: "directory", children: [] },
+          drawingData: null,
+        };
+        if (!await roomSnapshotStorage.createRoomSnapshotIfAbsent(snapshot)) continue;
+        roomService.reserveRoom(roomId);
+        acknowledge?.({ ok: true, roomId });
+        return;
+      }
+      acknowledge?.({ ok: false, message: "Could not find an available room code. Try again." });
+    } catch (error) {
+      logger.error("Failed to create a room:", error);
+      acknowledge?.({ ok: false, message: "Could not create a room. Check S3 access and try again." });
+    }
+  });
+
+  socket.on(SocketEvent.SAVE_ROOM, async (_payload, acknowledge) => {
+    const roomId = roomService.getRoomId(socket.id);
+    if (!roomId) {
+      acknowledge?.({ ok: false, message: "Join a room before saving." });
+      return;
+    }
+
+    try {
+      const snapshot = roomService.createRoomSnapshot(roomId);
+      const result = await roomSnapshotStorage.saveRoomSnapshot(snapshot);
+      acknowledge?.({ ok: true, ...result });
+      logger.info(`Saved snapshot for room ${roomId} (${result.bytes} bytes)`);
+    } catch (error) {
+      logger.error(`Failed to save snapshot for room ${roomId}:`, error);
+      acknowledge?.({ ok: false, message: error.code === "S3_NOT_CONFIGURED"
+        ? "S3 storage is not configured on the server yet."
+        : "Could not save this room to S3. Check server storage access and try again." });
     }
   });
 

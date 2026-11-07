@@ -3,7 +3,7 @@ import FileStructureView from "@/components/files/FileStructureView"
 import { useFileSystem } from "@/context/FileContext"
 import useResponsive from "@/hooks/useResponsive"
 import cn from "classnames"
-import { BiArchiveIn } from "react-icons/bi"
+import { BiArchiveIn, BiSave } from "react-icons/bi"
 import { TbFileUpload } from "react-icons/tb"
 import { v4 as uuidV4 } from "uuid"
 import { toast } from "react-hot-toast"
@@ -15,6 +15,24 @@ function FilesView() {
     const { viewHeight, minHeightReached } = useResponsive()
     const [isLoading, setIsLoading] = useState(false)
     const { socket } = useSocket();
+
+    const handleSaveRoom = async () => {
+        if (!socket?.connected) {
+            toast.error("Connect to a room before saving.")
+            return
+        }
+
+        setIsLoading(true)
+        try {
+            const result = await socket.timeout(20000).emitWithAck(SocketEvent.SAVE_ROOM)
+            if (!result?.ok) throw new Error(result?.message || "Could not save this room.")
+            toast.success("Room snapshot saved")
+        } catch (error) {
+            toast.error(error.message || "Could not save this room. Check your connection.")
+        } finally {
+            setIsLoading(false)
+        }
+    }
 
     const handleOpenDirectory = async () => {
         try {
@@ -199,6 +217,14 @@ function FilesView() {
                 >
                     <TbFileUpload className="mr-2" size={24} />
                     {isLoading ? "Loading..." : "Open File/Folder"}
+                </button>
+                <button
+                    className="flex w-full justify-start rounded-md p-2 transition-all hover:bg-darkHover"
+                    onClick={handleSaveRoom}
+                    disabled={isLoading}
+                    title="Save shared files and drawing to the room snapshot"
+                >
+                    <BiSave className="mr-2" size={22} /> {isLoading ? "Saving..." : "Save changes"}
                 </button>
                 <button
                     className="flex w-full justify-start rounded-md p-2 transition-all hover:bg-darkHover"

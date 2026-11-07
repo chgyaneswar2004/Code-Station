@@ -54,7 +54,7 @@ function Sidebar() {
             >
                 <SidebarButton viewName={VIEWS.FILES} icon={viewIcons[VIEWS.FILES]} />
                 <SidebarButton viewName={VIEWS.CHATS} icon={viewIcons[VIEWS.CHATS]} />
-                {/* <SidebarButton viewName={VIEWS.COPILOT} icon={viewIcons[VIEWS.COPILOT]} /> */}
+                <SidebarButton viewName={VIEWS.COPILOT} icon={viewIcons[VIEWS.COPILOT]} />
                 <SidebarButton viewName={VIEWS.RUN} icon={viewIcons[VIEWS.RUN]} />
                 <SidebarButton viewName={VIEWS.CLIENTS} icon={viewIcons[VIEWS.CLIENTS]} />
                 <SidebarButton viewName={VIEWS.SETTINGS} icon={viewIcons[VIEWS.SETTINGS]} />

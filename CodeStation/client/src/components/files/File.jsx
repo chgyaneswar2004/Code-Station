@@ -25,7 +25,7 @@ const File = ({ item, setSelectedDirId, selectedFiles = [] }) => {
     const handleFileClick = (fileId) => {
         if (isEditing) return
         setSelectedDirId(fileId)
-        openFile(fileId, true)
+        openFile(fileId)
         if (isMobile) setIsSidebarOpen(false)
         if (activityState === "DRAWING") {
             setActivityState("CODING")

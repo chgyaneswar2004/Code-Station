@@ -186,7 +186,7 @@ function FileContextProvider({ children }) {
         socket.emit(SocketEvent.DIRECTORY_DELETED, { dirId })
     }, [socket])
 
-    const openFile = (fileId, emitSocket = true) => {
+    const openFile = (fileId) => {
         const file = getFileById(fileStructure, fileId)
         if (file) {
             updateFileContent(activeFile?.id || "", activeFile?.content || "")
@@ -199,13 +199,11 @@ function FileContextProvider({ children }) {
                 )
             )
             setActiveFile(file)
-            if (emitSocket && fileId !== activeFile?.id) {
-                socket.emit(SocketEvent.ACTIVE_FILE_CHANGED, { fileId })
-            }
+            // Open tabs and active-file selection are local to each participant.
         }
     }
 
-    const closeFile = (fileId, sendToSocket = true) => {
+    const closeFile = (fileId) => {
         if (fileId === activeFile?.id) {
             updateFileContent(activeFile.id, activeFile.content || "")
             const index = openFiles.findIndex(f => f.id === fileId)
@@ -216,12 +214,10 @@ function FileContextProvider({ children }) {
             )
         }
         setOpenFiles(prev => prev.filter(f => f.id !== fileId))
-        if (sendToSocket) {
-            socket.emit(SocketEvent.CLOSE_FILE_TAB, { fileId })
-        }
+        // Closing a tab only changes this participant's editor.
     }
 
-    const createFile = useCallback((parentDirId, file, sendToSocket = true) => {
+    const createFile = useCallback((parentDirId, file, sendToSocket = true, openInEditor = true) => {
         let num = 1
         if (!parentDirId) parentDirId = fileStructure.id
         const parentDir = findParentDirectory(fileStructure, parentDirId)
@@ -258,8 +254,10 @@ function FileContextProvider({ children }) {
         }
 
         setFileStructure(prev => addFile(prev))
-        setOpenFiles(prev => [...prev, newFile])
-        setActiveFile(newFile)
+        if (openInEditor) {
+            setOpenFiles(prev => [...prev, newFile])
+            setActiveFile(newFile)
+        }
 
         if (!sendToSocket) return newFile.id
         socket.emit(SocketEvent.FILE_CREATED, { parentDirId, newFile })
@@ -357,7 +355,8 @@ function FileContextProvider({ children }) {
     useEffect(() => {
         // FILE CREATED
         const handleFileCreated = ({ parentDirId, newFile }) => {
-            createFile(parentDirId || fileStructure.id, newFile, false)
+            // Keep the shared file tree in sync without opening a tab for other users.
+            createFile(parentDirId || fileStructure.id, newFile, false, false)
         }
         // FILE DELETED
         const handleFileDeleted = ({ fileId }) => {
@@ -387,19 +386,18 @@ function FileContextProvider({ children }) {
         const handleDirectoryUpdated = ({ dirId, children }) => {
             updateDirectory(dirId, children, false)
         }
-        // SYNC_FILE_STRUCTURE handler
-        const handleSyncFileStructure = ({ fileStructure, openFiles, activeFile }) => {
-            setFileStructure(fileStructure)
-            setOpenFiles(openFiles)
-            setActiveFile(activeFile)
-        }
-        // ACTIVE_FILE_CHANGED handler
-        const handleActiveFileChanged = ({ fileId }) => {
-            openFile(fileId, false)
-        }
-        // CLOSE_FILE_TAB handler
-        const handleCloseFileTab = ({ fileId }) => {
-            closeFile(fileId, false)
+        // Sync shared files, while retaining this participant's own open tabs.
+        const handleSyncFileStructure = ({ fileStructure: incomingFileStructure }) => {
+            if (!incomingFileStructure) return
+            setFileStructure(incomingFileStructure)
+            setOpenFiles((currentFiles) =>
+                currentFiles
+                    .map((file) => getFileById(incomingFileStructure, file.id))
+                    .filter(Boolean),
+            )
+            setActiveFile((currentFile) =>
+                currentFile ? getFileById(incomingFileStructure, currentFile.id) : null,
+            )
         }
 
         socket.on(SocketEvent.FILE_CREATED, handleFileCreated)
@@ -411,8 +409,6 @@ function FileContextProvider({ children }) {
         socket.on(SocketEvent.FILE_UPDATED, handleFileUpdated)
         socket.on(SocketEvent.DIRECTORY_UPDATED, handleDirectoryUpdated)
         socket.on(SocketEvent.SYNC_FILE_STRUCTURE, handleSyncFileStructure)
-        socket.on(SocketEvent.ACTIVE_FILE_CHANGED, handleActiveFileChanged)
-        socket.on(SocketEvent.CLOSE_FILE_TAB, handleCloseFileTab)
 
         return () => {
             socket.off(SocketEvent.FILE_CREATED, handleFileCreated)
@@ -424,8 +420,6 @@ function FileContextProvider({ children }) {
             socket.off(SocketEvent.FILE_UPDATED, handleFileUpdated)
             socket.off(SocketEvent.DIRECTORY_UPDATED, handleDirectoryUpdated)
             socket.off(SocketEvent.SYNC_FILE_STRUCTURE, handleSyncFileStructure)
-            socket.off(SocketEvent.ACTIVE_FILE_CHANGED, handleActiveFileChanged)
-            socket.off(SocketEvent.CLOSE_FILE_TAB, handleCloseFileTab)
         }
     }, [socket, createFile, deleteFile, renameFile, createDirectory, deleteDirectory, renameDirectory, updateFileContent, updateDirectory, openFile, closeFile])
 

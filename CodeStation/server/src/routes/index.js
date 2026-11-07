@@ -5,13 +5,17 @@ const fs = require("fs");
 const compilerRouter = require("./compiler.routes");
 const { compilerRateLimiter } = require("../middleware/security.middleware");
 const logger = require("../utils/logger");
+const bobRouter = require("../../../bob/server/bob.routes")(express);
 
 // Mount compiler endpoints
+router.get("/api/health", (_req, res) => res.json({ status: "ok" }));
+
 // 1. Maintain original API contract endpoint
 router.use("/api/compiler", compilerRouter);
 
 // 2. Added API Versioning support (Recommendation)
 router.use("/api/v1/compiler", compilerRouter);
+router.use("/api/bob", bobRouter);
 
 // Apply rate limiter specifically to run code endpoints
 router.use("/api/compiler/run", compilerRateLimiter);

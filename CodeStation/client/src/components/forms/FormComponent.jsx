@@ -2,10 +2,9 @@ import { useAppContext } from "@/context/AppContext"
 import { useSocket } from "@/context/SocketContext"
 import { SocketEvent } from "@/types/socket"
 import { USER_STATUS } from "@/types/user"
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import { toast } from "react-hot-toast"
 import { useLocation, useNavigate } from "react-router-dom"
-import { v4 as uuidv4 } from "uuid"
 import logo from "@/assets/logo.svg"
 
 const FormComponent = () => {
@@ -15,22 +14,34 @@ const FormComponent = () => {
 
     const usernameRef = useRef(null)
     const roomIdRef = useRef(null)
+    const [isCreatingRoom, setIsCreatingRoom] = useState(false)
     const navigate = useNavigate()
 
-    const createNewRoomId = () => {
-        const newRoomId = uuidv4()
-        setCurrentUser({ ...currentUser, roomId: newRoomId })
-        toast.success("Created a new Room Id")
-        usernameRef.current?.focus()
-        setTimeout(() => {
-            roomIdRef.current?.dispatchEvent(new Event("focus"))
-        }, 0)
+    const createNewRoomId = async () => {
+        if (!socket.connected || isCreatingRoom) {
+            toast.error("Connect to the server before creating a room.")
+            return
+        }
+
+        setIsCreatingRoom(true)
+        try {
+            const result = await socket.timeout(15000).emitWithAck(SocketEvent.CREATE_ROOM)
+            if (!result?.ok) throw new Error(result?.message || "Could not create a room.")
+            setCurrentUser({ ...currentUser, roomId: result.roomId })
+            toast.success("Created a five-character room code")
+            usernameRef.current?.focus()
+            setTimeout(() => roomIdRef.current?.dispatchEvent(new Event("focus")), 0)
+        } catch (error) {
+            toast.error(error.message || "Could not create a room. Try again.")
+        } finally {
+            setIsCreatingRoom(false)
+        }
     }
 
     const handleInputChanges = (e) => {
         const name = e.target.name
         const value = e.target.value
-        setCurrentUser({ ...currentUser, [name]: value })
+        setCurrentUser({ ...currentUser, [name]: name === "roomId" ? value.toUpperCase().slice(0, 5) : value })
     }
 
     const validateForm = () => {
@@ -40,8 +51,8 @@ const FormComponent = () => {
         } else if (currentUser.roomId.trim().length === 0) {
             toast.error("Enter a room id")
             return false
-        } else if (currentUser.roomId.trim().length < 5) {
-            toast.error("ROOM Id must be at least 5 characters long")
+        } else if (currentUser.roomId.trim().length !== 5) {
+            toast.error("Room ID must be exactly 5 characters")
             return false
         } else if (currentUser.username.trim().length < 3) {
             toast.error("Username must be at least 3 characters long")
@@ -100,6 +111,8 @@ const FormComponent = () => {
                         type="text"
                         name="roomId"
                         ref={roomIdRef}
+                        maxLength={5}
+                        autoCapitalize="characters"
                         className="peer w-full border-b-2 border-blue-400 bg-transparent px-3 py-3 focus:outline-none"
                         onChange={handleInputChanges}
                         value={currentUser.roomId}
@@ -139,8 +152,9 @@ const FormComponent = () => {
             <button
                 className="cursor-pointer select-none text-white hover:text-blue-400"
                 onClick={createNewRoomId}
+                disabled={isCreatingRoom}
             >
-                Generate Unique Room Id
+                {isCreatingRoom ? "Creating room..." : "Generate 5-character room code"}
             </button>
         </div>
     )

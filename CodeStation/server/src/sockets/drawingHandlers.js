@@ -3,14 +3,24 @@ const { SocketEvent } = require("../utils/constants");
 const roomService = require("../services/room.service");
 
 module.exports = (io, socket) => {
-  // Handle request for drawing data from a new user
+  // Return the room's authoritative snapshot to the requesting client.
   socket.on(SocketEvent.REQUEST_DRAWING, () => {
     const roomId = roomService.getRoomId(socket.id);
     if (!roomId) return;
-    
-    socket.broadcast
-      .to(roomId)
-      .emit(SocketEvent.REQUEST_DRAWING, { socketId: socket.id });
+
+    const drawingData = roomService.getRoomDrawingData(roomId);
+    if (drawingData) {
+      io.to(socket.id).emit(SocketEvent.SYNC_DRAWING, { drawingData });
+    } else {
+      io.to(socket.id).emit(SocketEvent.NO_DRAWING_DATA);
+    }
+  });
+
+  // Seed an empty room once when its first drawing editor is opened.
+  socket.on(SocketEvent.DRAWING_SNAPSHOT, ({ drawingData }) => {
+    const roomId = roomService.getRoomId(socket.id);
+    if (!roomId) return;
+    roomService.saveRoomDrawingDataIfAbsent(roomId, drawingData);
   });
 
   // Handle syncing drawing data back to the requesting user
@@ -37,7 +47,7 @@ module.exports = (io, socket) => {
       return;
     }
 
-    // Save the updated drawing data snapshot to room service
+    // Merge this change into the authoritative full snapshot on the server.
     if (snapshot) {
       roomService.saveRoomDrawingData(roomId, snapshot);
     }
