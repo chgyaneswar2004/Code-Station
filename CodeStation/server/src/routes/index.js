@@ -21,14 +21,18 @@ router.use("/api/bob", bobRouter);
 router.use("/api/compiler/run", compilerRateLimiter);
 router.use("/api/v1/compiler/run", compilerRateLimiter);
 
-// Serve static HTML index
-router.get("/", (req, res) => {
+// Serve the production client when available; retain the simple server page for API-only dev.
+router.get("/", (_req, res) => {
+  const distIndex = path.join(__dirname, "../../../client/dist/index.html");
+  if (fs.existsSync(distIndex)) {
+    return res.sendFile(distIndex);
+  }
+
   const indexPath = path.join(__dirname, "../..", "public", "index.html");
   if (fs.existsSync(indexPath)) {
-    res.sendFile(indexPath);
-  } else {
-    res.json({ message: "Server is running" });
+    return res.sendFile(indexPath);
   }
+  return res.json({ message: "Server is running" });
 });
 
 // Fallback route to serve react production build
