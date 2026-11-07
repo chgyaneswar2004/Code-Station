@@ -116,7 +116,9 @@ module.exports = (io, socket) => {
     }
   });
 
-  socket.on(SocketEvent.SAVE_ROOM, async (_payload, acknowledge) => {
+  // The client sends SAVE_ROOM without a payload, so Socket.IO passes the
+  // acknowledgement callback as the first argument.
+  socket.on(SocketEvent.SAVE_ROOM, async (acknowledge) => {
     const roomId = roomService.getRoomId(socket.id);
     if (!roomId) {
       acknowledge?.({ ok: false, message: "Join a room before saving." });
